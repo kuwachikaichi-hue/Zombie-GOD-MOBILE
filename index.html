@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Zombie GOD ULTIMATE COMPLETE</title>
+<title>Zombie GOD ULTIMATE FINAL+</title>
 
 <style>
 body{margin:0;background:#000;color:#0f0;font-family:monospace;overflow:hidden;touch-action:none;}
 #ui{position:absolute;top:10px;left:10px;font-size:18px;z-index:10;}
-button{font-size:18px;padding:10px;background:#000;color:#0f0;border:2px solid #0f0;border-radius:10px;}
+button{font-size:16px;padding:8px;margin-top:5px;background:#000;color:#0f0;border:2px solid #0f0;border-radius:10px;}
+
 #stickBase{position:absolute;left:20px;bottom:20px;width:150px;height:150px;border:3px solid #0ff;border-radius:50%;}
 #stick{position:absolute;width:70px;height:70px;background:#0ff;border-radius:50%;left:40px;top:40px;}
 </style>
@@ -22,8 +23,10 @@ button{font-size:18px;padding:10px;background:#000;color:#0f0;border:2px solid #
 💰<span id="money">0</span>
 🏆<span id="score">0</span>
 🔥<span id="combo">1</span>x<br>
+⚔️<span id="atk">1</span><br>
 🔫<span id="weapon">Pistol</span><br>
-<button onclick="gacha()">🎰</button>
+<button onclick="gacha()">🎰ガチャ</button>
+<button onclick="levelUp()">⬆️強化(200)</button>
 </div>
 
 <div id="stickBase"><div id="stick"></div></div>
@@ -43,20 +46,11 @@ let boss=null,bossBullets=[];
 let hp=100,money=0,score=0;
 let combo=1,comboTimer=0;
 let weapon="Pistol";
+let atk=1;
+
 let time=0,shot=0;
 let gameOver=false;
 let shake=0;
-
-/* ===== ターゲット ===== */
-function getTarget(){
- if(zombies.length===0) return null;
- let closest=null,min=999999;
- for(let z of zombies){
-  let d=Math.hypot(z.x-player.x,z.y-player.y);
-  if(d<min){min=d;closest=z;}
- }
- return closest;
-}
 
 /* ===== 敵 ===== */
 setInterval(()=>{
@@ -75,10 +69,20 @@ setInterval(()=>{
  }
 },1000);
 
+/* ===== ターゲット ===== */
+function getTarget(){
+ if(zombies.length===0)return null;
+ let min=999999,t=null;
+ for(let z of zombies){
+  let d=Math.hypot(z.x-player.x,z.y-player.y);
+  if(d<min){min=d;t=z;}
+ }
+ return t;
+}
+
 /* ===== 射撃 ===== */
 setInterval(()=>{
  if(gameOver)return;
-
  let t=getTarget();
  if(!t)return;
 
@@ -86,18 +90,17 @@ setInterval(()=>{
  let dy=t.y-player.y;
  let d=Math.hypot(dx,dy);
  if(d===0)return;
-
  dx/=d; dy/=d;
 
- let muzzle=16;
+ let muzzle=18;
 
- function shoot(speed,dmg){
+ function shoot(speed,baseDmg){
   bullets.push({
    x:player.x+dx*muzzle,
    y:player.y+dy*muzzle,
    dx:dx*speed,
    dy:dy*speed,
-   dmg:dmg
+   dmg:baseDmg*atk
   });
 
   effects.push({
@@ -113,7 +116,17 @@ setInterval(()=>{
  else if(weapon==="Shotgun"){
   for(let i=0;i<5;i++){
    let spread=(Math.random()-0.5)*0.4;
-   shoot(8,1);
+   let sdx=dx+spread;
+   let sdy=dy+spread;
+   let sd=Math.hypot(sdx,sdy);
+   sdx/=sd; sdy/=sd;
+   bullets.push({
+    x:player.x+sdx*muzzle,
+    y:player.y+sdy*muzzle,
+    dx:sdx*8,
+    dy:sdy*8,
+    dmg:1*atk
+   });
   }
  }
 
@@ -125,34 +138,57 @@ setInterval(()=>{
 
 },120);
 
-/* ===== ガチャ ===== */
+/* ===== ガチャ（脳汁） ===== */
 function gacha(){
  if(money<100||gameOver)return;
  money-=100;
 
- effects.push({type:"dark",t:30});
- setTimeout(()=>effects.push({type:"flash",t:20}),200);
+ effects.push({type:"gachaDark",t:40});
+
+ setTimeout(()=>{
+  effects.push({type:"gachaFlash",t:20});
+ },300);
 
  setTimeout(()=>{
   let r=Math.random();
-  if(r<0.6)weapon="Pistol";
-  else if(r<0.9)weapon="Shotgun";
-  else if(r<0.98)weapon="Laser";
+  let result="Pistol";
+
+  if(r<0.6) result="Pistol";
+  else if(r<0.9) result="Shotgun";
+  else if(r<0.98) result="Laser";
   else{
-   weapon="GOD";
-   shake=20;
+   result="GOD";
+   shake=25;
   }
-  effects.push({type:"text",text:weapon,t:40});
- },400);
+
+  weapon=result;
+
+  effects.push({type:"gachaText",text:"!!!",t:20});
+  setTimeout(()=>{
+   effects.push({type:"gachaText",text:result,t:40});
+  },200);
+
+ },600);
+}
+
+/* ===== レベルアップ ===== */
+function levelUp(){
+ if(money<200)return;
+ money-=200;
+ atk++;
+ shake=10;
 }
 
 /* ===== ダメージ ===== */
 function damageEnemy(z,d){
  let crit=Math.random()<0.2;
  if(crit)d*=3;
+
  z.hp-=d;
 
- damages.push({x:z.x,y:z.y,v:d,t:30,crit});
+ damages.push({
+  x:z.x,y:z.y,v:d,t:30,crit
+ });
 }
 
 /* ===== 撃破 ===== */
@@ -164,7 +200,6 @@ function kill(z){
  score+=gain;
 
  coins.push({x:z.x,y:z.y,v:gain});
- effects.push({type:"hit",x:z.x,y:z.y,t:20});
 }
 
 /* ===== 更新 ===== */
@@ -176,10 +211,7 @@ function update(){
  player.vx*=0.85;
  player.vy*=0.85;
 
- bullets.forEach(b=>{
-  b.x+=b.dx;
-  b.y+=b.dy;
- });
+ bullets.forEach(b=>{b.x+=b.dx;b.y+=b.dy;});
 
  zombies.forEach(z=>{
   let dx=player.x-z.x;
@@ -204,7 +236,7 @@ function update(){
   return true;
  });
 
- /* ===== ボス ===== */
+ /* ボス */
  if(boss){
   boss.y+=1;
   if(boss.y>120)boss.y=120;
@@ -262,6 +294,7 @@ function update(){
  document.getElementById("score").textContent=Math.floor(score);
  document.getElementById("combo").textContent=combo;
  document.getElementById("weapon").textContent=weapon;
+ document.getElementById("atk").textContent=atk;
 }
 
 /* ===== 描画 ===== */
@@ -275,16 +308,8 @@ function draw(){
 
  ctx.fillStyle="#000";ctx.fillRect(0,0,c.width,c.height);
 
- /* プレイヤー */
  ctx.fillStyle="#0ff";
  ctx.beginPath();ctx.arc(player.x,player.y,12,0,Math.PI*2);ctx.fill();
-
- /* 向き */
- ctx.strokeStyle="#0ff";
- ctx.beginPath();
- ctx.moveTo(player.x,player.y);
- ctx.lineTo(player.x+player.vx*5,player.y+player.vy*5);
- ctx.stroke();
 
  /* 弾 */
  bullets.forEach(b=>{
@@ -310,11 +335,6 @@ function draw(){
   ctx.fillRect(20,c.height-20,(boss.hp/boss.max)*200,10);
  }
 
- bossBullets.forEach(b=>{
-  ctx.fillStyle="#ff0";
-  ctx.fillRect(b.x,b.y,6,6);
- });
-
  coins.forEach(c=>{
   ctx.fillStyle="#ff0";
   ctx.fillRect(c.x,c.y,6,6);
@@ -334,19 +354,15 @@ function draw(){
    ctx.lineTo(e.x-e.dx*20,e.y-e.dy*20);
    ctx.stroke();
   }
-  if(e.type==="beam"){
-   ctx.fillStyle="rgba(255,255,0,"+(e.t/20)+")";
-   ctx.fillRect(e.x-5,0,10,c.height);
-  }
-  if(e.type==="flash"){
-   ctx.fillStyle="rgba(255,255,255,"+(e.t/20)+")";
+  if(e.type==="gachaDark"){
+   ctx.fillStyle="rgba(0,0,0,0.8)";
    ctx.fillRect(0,0,c.width,c.height);
   }
-  if(e.type==="dark"){
-   ctx.fillStyle="rgba(0,0,0,0.7)";
+  if(e.type==="gachaFlash"){
+   ctx.fillStyle="rgba(255,255,255,0.7)";
    ctx.fillRect(0,0,c.width,c.height);
   }
-  if(e.type==="text"){
+  if(e.type==="gachaText"){
    ctx.fillStyle="#0ff";
    ctx.font="40px monospace";
    ctx.fillText(e.text,c.width/2-100,c.height/2);
@@ -357,8 +373,6 @@ function draw(){
   ctx.fillStyle="#fff";
   ctx.font="40px monospace";
   ctx.fillText("GAME OVER",c.width/2-120,c.height/2);
-  ctx.font="20px monospace";
-  ctx.fillText("TAP TO RETRY",c.width/2-100,c.height/2+40);
  }
 
  ctx.restore();
@@ -391,7 +405,7 @@ ontouchstart=()=>{
  if(gameOver) location.reload();
 };
 
-/* ===== ループ ===== */
+/* ループ */
 function loop(){
  update();
  draw();
