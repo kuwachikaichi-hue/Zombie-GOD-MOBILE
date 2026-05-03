@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zombie GOD ULTIMATE COMPLETE</title>
+
+<style>
+body{margin:0;background:#000;color:#0f0;font-family:monospace;overflow:hidden;touch-action:none;}
+#ui{position:absolute;top:10px;left:10px;font-size:18px;z-index:10;}
+button{font-size:18px;padding:10px;background:#000;color:#0f0;border:2px solid #0f0;border-radius:10px;}
+#stickBase{position:absolute;left:20px;bottom:20px;width:150px;height:150px;border:3px solid #0ff;border-radius:50%;}
+#stick{position:absolute;width:70px;height:70px;background:#0ff;border-radius:50%;left:40px;top:40px;}
+</style>
+</head>
+
+<body>
+<canvas id="game"></canvas>
+
+<div id="ui">
+❤️<span id="hp">100</span>
+💰<span id="money">0</span>
+🏆<span id="score">0</span>
+🔥<span id="combo">1</span>x<br>
+🔫<span id="weapon">Pistol</span><br>
+<button onclick="gacha()">🎰</button>
+</div>
+
+<div id="stickBase"><div id="stick"></div></div>
+
+<script>
+const c=document.getElementById("game");
+const ctx=c.getContext("2d");
+
+function resize(){c.width=innerWidth;c.height=innerHeight;}
+resize();onresize=resize;
+
+/* ===== 状態 ===== */
+let player={x:c.width/2,y:c.height/2,vx:0,vy:0};
+let bullets=[],zombies=[],effects=[],damages=[],coins=[];
+let boss=null,bossBullets=[];
+
+let hp=100,money=0,score=0;
+let combo=1,comboTimer=0;
+let weapon="Pistol";
+let time=0,shot=0;
+let gameOver=false;
+let shake=0;
+
+/* ===== ターゲット ===== */
+function getTarget(){
+ if(zombies.length===0) return null;
+ let closest=null,min=999999;
+ for(let z of zombies){
+  let d=Math.hypot(z.x-player.x,z.y-player.y);
+  if(d<min){min=d;closest=z;}
+ }
+ return closest;
+}
+
+/* ===== 敵 ===== */
+setInterval(()=>{
+ if(gameOver)return;
+ time++;
+ let rate=2+Math.floor(time/8);
+ for(let i=0;i<rate;i++){
+  zombies.push({x:Math.random()*c.width,y:Math.random()*c.height,hp:3});
+ }
+},700);
+
+/* ===== ボス ===== */
+setInterval(()=>{
+ if(!boss && time>20 && !gameOver){
+  boss={x:c.width/2,y:-100,hp:300,max:300};
+ }
+},1000);
+
+/* ===== 射撃 ===== */
+setInterval(()=>{
+ if(gameOver)return;
+
+ let t=getTarget();
+ if(!t)return;
+
+ let dx=t.x-player.x;
+ let dy=t.y-player.y;
+ let d=Math.hypot(dx,dy);
+ if(d===0)return;
+
+ dx/=d; dy/=d;
+
+ let muzzle=16;
+
+ function shoot(speed,dmg){
+  bullets.push({
+   x:player.x+dx*muzzle,
+   y:player.y+dy*muzzle,
+   dx:dx*speed,
+   dy:dy*speed,
+   dmg:dmg
+  });
+
+  effects.push({
+   type:"muzzle",
+   x:player.x+dx*muzzle,
+   y:player.y+dy*muzzle,
+   dx,dy,t:8
+  });
+ }
+
+ if(weapon==="Pistol") shoot(10,1);
+
+ else if(weapon==="Shotgun"){
+  for(let i=0;i<5;i++){
+   let spread=(Math.random()-0.5)*0.4;
+   shoot(8,1);
+  }
+ }
+
+ else if(weapon==="Laser") shoot(15,2);
+
+ else if(weapon==="GOD"){
+  zombies.forEach(z=>z.hp=0);
+ }
+
+},120);
+
+/* ===== ガチャ ===== */
+function gacha(){
+ if(money<100||gameOver)return;
+ money-=100;
+
+ effects.push({type:"dark",t:30});
+ setTimeout(()=>effects.push({type:"flash",t:20}),200);
+
+ setTimeout(()=>{
+  let r=Math.random();
+  if(r<0.6)weapon="Pistol";
+  else if(r<0.9)weapon="Shotgun";
+  else if(r<0.98)weapon="Laser";
+  else{
+   weapon="GOD";
+   shake=20;
+  }
+  effects.push({type:"text",text:weapon,t:40});
+ },400);
+}
+
+/* ===== ダメージ ===== */
+function damageEnemy(z,d){
+ let crit=Math.random()<0.2;
+ if(crit)d*=3;
+ z.hp-=d;
+
+ damages.push({x:z.x,y:z.y,v:d,t:30,crit});
+}
+
+/* ===== 撃破 ===== */
+function kill(z){
+ combo++;
+ comboTimer=60;
+
+ let gain=10*combo;
+ score+=gain;
+
+ coins.push({x:z.x,y:z.y,v:gain});
+ effects.push({type:"hit",x:z.x,y:z.y,t:20});
+}
+
+/* ===== 更新 ===== */
+function update(){
+ if(gameOver)return;
+
+ player.x+=player.vx;
+ player.y+=player.vy;
+ player.vx*=0.85;
+ player.vy*=0.85;
+
+ bullets.forEach(b=>{
+  b.x+=b.dx;
+  b.y+=b.dy;
+ });
+
+ zombies.forEach(z=>{
+  let dx=player.x-z.x;
+  let dy=player.y-z.y;
+  let d=Math.hypot(dx,dy);
+  z.x+=dx/d;
+  z.y+=dy/d;
+
+  if(d<20){
+   hp-=0.3;
+   shake=10;
+  }
+ });
+
+ zombies=zombies.filter(z=>{
+  for(let b of bullets){
+   if(Math.hypot(z.x-b.x,z.y-b.y)<15){
+    damageEnemy(z,b.dmg);
+    if(z.hp<=0){kill(z);return false;}
+   }
+  }
+  return true;
+ });
+
+ /* ===== ボス ===== */
+ if(boss){
+  boss.y+=1;
+  if(boss.y>120)boss.y=120;
+
+  bullets.forEach(b=>{
+   if(Math.hypot(boss.x-b.x,boss.y-b.y)<40){
+    damageEnemy(boss,b.dmg);
+   }
+  });
+
+  if(Math.random()<0.05){
+   let dx=player.x-boss.x;
+   let dy=player.y-boss.y;
+   let d=Math.hypot(dx,dy);
+   bossBullets.push({x:boss.x,y:boss.y,dx:dx/d*5,dy:dy/d*5});
+  }
+
+  if(boss.hp<=0){
+   for(let i=0;i<120;i++){
+    coins.push({x:boss.x,y:boss.y,v:20});
+   }
+   shake=30;
+   boss=null;
+  }
+ }
+
+ bossBullets.forEach(b=>{
+  b.x+=b.dx;b.y+=b.dy;
+  if(Math.hypot(player.x-b.x,player.y-b.y)<15){
+   hp-=1;
+   shake=15;
+  }
+ });
+
+ /* コイン */
+ coins.forEach(c=>{
+  c.x+=(player.x-c.x)*0.1;
+  c.y+=(player.y-c.y)*0.1;
+  if(Math.hypot(c.x-player.x,c.y-player.y)<20){
+   money+=c.v;c.v=0;
+  }
+ });
+ coins=coins.filter(c=>c.v>0);
+
+ comboTimer--;
+ if(comboTimer<=0)combo=1;
+
+ damages=damages.filter(d=>{d.y-=1.5;d.t--;return d.t>0;});
+ effects=effects.filter(e=>e.t-- >0);
+
+ if(hp<=0) gameOver=true;
+
+ document.getElementById("hp").textContent=Math.floor(hp);
+ document.getElementById("money").textContent=money;
+ document.getElementById("score").textContent=Math.floor(score);
+ document.getElementById("combo").textContent=combo;
+ document.getElementById("weapon").textContent=weapon;
+}
+
+/* ===== 描画 ===== */
+function draw(){
+ ctx.save();
+
+ if(shake>0){
+  ctx.translate((Math.random()-0.5)*shake,(Math.random()-0.5)*shake);
+  shake*=0.9;
+ }
+
+ ctx.fillStyle="#000";ctx.fillRect(0,0,c.width,c.height);
+
+ /* プレイヤー */
+ ctx.fillStyle="#0ff";
+ ctx.beginPath();ctx.arc(player.x,player.y,12,0,Math.PI*2);ctx.fill();
+
+ /* 向き */
+ ctx.strokeStyle="#0ff";
+ ctx.beginPath();
+ ctx.moveTo(player.x,player.y);
+ ctx.lineTo(player.x+player.vx*5,player.y+player.vy*5);
+ ctx.stroke();
+
+ /* 弾 */
+ bullets.forEach(b=>{
+  ctx.strokeStyle="#0f0";
+  ctx.beginPath();
+  ctx.moveTo(b.x,b.y);
+  ctx.lineTo(b.x-b.dx*2,b.y-b.dy*2);
+  ctx.stroke();
+
+  ctx.fillRect(b.x,b.y,4,4);
+ });
+
+ zombies.forEach(z=>{
+  ctx.strokeStyle="#f00";
+  ctx.strokeRect(z.x-12,z.y-12,24,24);
+ });
+
+ if(boss){
+  ctx.strokeStyle="#ff0";
+  ctx.strokeRect(boss.x-40,boss.y-40,80,80);
+
+  ctx.fillStyle="#f00";
+  ctx.fillRect(20,c.height-20,(boss.hp/boss.max)*200,10);
+ }
+
+ bossBullets.forEach(b=>{
+  ctx.fillStyle="#ff0";
+  ctx.fillRect(b.x,b.y,6,6);
+ });
+
+ coins.forEach(c=>{
+  ctx.fillStyle="#ff0";
+  ctx.fillRect(c.x,c.y,6,6);
+ });
+
+ damages.forEach(d=>{
+  ctx.fillStyle=d.crit?"#ff0":"#fff";
+  ctx.font=d.crit?"24px monospace":"14px monospace";
+  ctx.fillText(d.v,d.x,d.y);
+ });
+
+ effects.forEach(e=>{
+  if(e.type==="muzzle"){
+   ctx.strokeStyle="rgba(0,255,0,"+(e.t/10)+")";
+   ctx.beginPath();
+   ctx.moveTo(e.x,e.y);
+   ctx.lineTo(e.x-e.dx*20,e.y-e.dy*20);
+   ctx.stroke();
+  }
+  if(e.type==="beam"){
+   ctx.fillStyle="rgba(255,255,0,"+(e.t/20)+")";
+   ctx.fillRect(e.x-5,0,10,c.height);
+  }
+  if(e.type==="flash"){
+   ctx.fillStyle="rgba(255,255,255,"+(e.t/20)+")";
+   ctx.fillRect(0,0,c.width,c.height);
+  }
+  if(e.type==="dark"){
+   ctx.fillStyle="rgba(0,0,0,0.7)";
+   ctx.fillRect(0,0,c.width,c.height);
+  }
+  if(e.type==="text"){
+   ctx.fillStyle="#0ff";
+   ctx.font="40px monospace";
+   ctx.fillText(e.text,c.width/2-100,c.height/2);
+  }
+ });
+
+ if(gameOver){
+  ctx.fillStyle="#fff";
+  ctx.font="40px monospace";
+  ctx.fillText("GAME OVER",c.width/2-120,c.height/2);
+  ctx.font="20px monospace";
+  ctx.fillText("TAP TO RETRY",c.width/2-100,c.height/2+40);
+ }
+
+ ctx.restore();
+}
+
+/* ===== 操作 ===== */
+let dragging=false;
+stickBase.ontouchstart=()=>dragging=true;
+ontouchend=()=>dragging=false;
+
+ontouchmove=e=>{
+ if(!dragging)return;
+ let t=e.touches[0];
+ let r=stickBase.getBoundingClientRect();
+
+ let x=t.clientX-r.left-75;
+ let y=t.clientY-r.top-75;
+
+ let d=Math.hypot(x,y);
+ if(d>60){x=x/d*60;y=y/d*60;}
+
+ stick.style.left=(x+40)+"px";
+ stick.style.top=(y+40)+"px";
+
+ player.vx+=x*0.02;
+ player.vy+=y*0.02;
+};
+
+ontouchstart=()=>{
+ if(gameOver) location.reload();
+};
+
+/* ===== ループ ===== */
+function loop(){
+ update();
+ draw();
+ requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
