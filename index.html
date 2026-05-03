@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Zombie GOD ULTIMATE FINAL+</title>
+<title>Zombie GOD FINAL</title>
 
 <style>
 body{margin:0;background:#000;color:#0f0;font-family:monospace;overflow:hidden;touch-action:none;}
 #ui{position:absolute;top:10px;left:10px;font-size:18px;z-index:10;}
-button{font-size:16px;padding:8px;margin-top:5px;background:#000;color:#0f0;border:2px solid #0f0;border-radius:10px;}
+button{font-size:16px;padding:8px;margin-top:4px;background:#000;color:#0f0;border:2px solid #0f0;border-radius:8px;}
 
 #stickBase{position:absolute;left:20px;bottom:20px;width:150px;height:150px;border:3px solid #0ff;border-radius:50%;}
 #stick{position:absolute;width:70px;height:70px;background:#0ff;border-radius:50%;left:40px;top:40px;}
@@ -23,41 +23,39 @@ button{font-size:16px;padding:8px;margin-top:5px;background:#000;color:#0f0;bord
 💰<span id="money">0</span>
 🏆<span id="score">0</span>
 🔥<span id="combo">1</span>x<br>
-⚔️<span id="atk">1</span><br>
 🔫<span id="weapon">Pistol</span><br>
+
 <button onclick="gacha()">🎰ガチャ</button>
-<button onclick="levelUp()">⬆️強化(200)</button>
+<button onclick="levelUp()">⬆強化</button>
 </div>
 
 <div id="stickBase"><div id="stick"></div></div>
 
 <script>
-const c=document.getElementById("game");
-const ctx=c.getContext("2d");
-
+const c=game,ctx=c.getContext("2d");
 function resize(){c.width=innerWidth;c.height=innerHeight;}
 resize();onresize=resize;
 
+/* ===== プレイヤー ===== */
+let player={x:c.width/2,y:c.height/2,vx:0,vy:0,atk:1};
+
 /* ===== 状態 ===== */
-let player={x:c.width/2,y:c.height/2,vx:0,vy:0};
-let bullets=[],zombies=[],effects=[],damages=[],coins=[];
-let boss=null,bossBullets=[];
+let bullets=[],zombies=[],boss=null,bossBullets=[];
+let effects=[],damages=[],coins=[];
+let skills=[];
 
 let hp=100,money=0,score=0;
 let combo=1,comboTimer=0;
 let weapon="Pistol";
-let atk=1;
-
 let time=0,shot=0;
-let gameOver=false;
-let shake=0;
+let gameOver=false,shake=0;
 
 /* ===== 敵 ===== */
 setInterval(()=>{
  if(gameOver)return;
  time++;
- let rate=2+Math.floor(time/8);
- for(let i=0;i<rate;i++){
+ let r=2+Math.floor(time/8);
+ for(let i=0;i<r;i++){
   zombies.push({x:Math.random()*c.width,y:Math.random()*c.height,hp:3});
  }
 },700);
@@ -65,15 +63,18 @@ setInterval(()=>{
 /* ===== ボス ===== */
 setInterval(()=>{
  if(!boss && time>20 && !gameOver){
-  boss={x:c.width/2,y:-100,hp:300,max:300};
+  boss={x:c.width/2,y:-100,hp:400,max:400,phase:1};
  }
 },1000);
 
 /* ===== ターゲット ===== */
 function getTarget(){
- if(zombies.length===0)return null;
- let min=999999,t=null;
- for(let z of zombies){
+ let all=[...zombies];
+ if(boss) all.push(boss);
+ if(all.length===0)return null;
+
+ let min=99999,t=null;
+ for(let z of all){
   let d=Math.hypot(z.x-player.x,z.y-player.y);
   if(d<min){min=d;t=z;}
  }
@@ -83,6 +84,7 @@ function getTarget(){
 /* ===== 射撃 ===== */
 setInterval(()=>{
  if(gameOver)return;
+
  let t=getTarget();
  if(!t)return;
 
@@ -92,103 +94,48 @@ setInterval(()=>{
  if(d===0)return;
  dx/=d; dy/=d;
 
- let muzzle=18;
+ let offset=16;
 
- function shoot(speed,baseDmg){
+ function shoot(spd,dmg){
   bullets.push({
-   x:player.x+dx*muzzle,
-   y:player.y+dy*muzzle,
-   dx:dx*speed,
-   dy:dy*speed,
-   dmg:baseDmg*atk
+   x:player.x+dx*offset,
+   y:player.y+dy*offset,
+   dx:dx*spd,
+   dy:dy*spd,
+   dmg:dmg*player.atk
   });
 
-  effects.push({
-   type:"muzzle",
-   x:player.x+dx*muzzle,
-   y:player.y+dy*muzzle,
-   dx,dy,t:8
-  });
+  effects.push({type:"muzzle",x:player.x+dx*offset,y:player.y+dy*offset,dx,dy,t:10});
  }
 
  if(weapon==="Pistol") shoot(10,1);
-
  else if(weapon==="Shotgun"){
   for(let i=0;i<5;i++){
-   let spread=(Math.random()-0.5)*0.4;
-   let sdx=dx+spread;
-   let sdy=dy+spread;
-   let sd=Math.hypot(sdx,sdy);
-   sdx/=sd; sdy/=sd;
-   bullets.push({
-    x:player.x+sdx*muzzle,
-    y:player.y+sdy*muzzle,
-    dx:sdx*8,
-    dy:sdy*8,
-    dmg:1*atk
-   });
+   let r=(Math.random()-0.5)*0.3;
+   shoot(8,1);
   }
  }
+ else if(weapon==="Laser") shoot(16,2);
 
- else if(weapon==="Laser") shoot(15,2);
-
- else if(weapon==="GOD"){
-  zombies.forEach(z=>z.hp=0);
+ if(skills.includes("beam") && shot%5===0){
+  let bx=Math.random()*c.width;
+  zombies.forEach(z=>{if(Math.abs(z.x-bx)<50)z.hp-=5;});
+  effects.push({type:"beam",x:bx,t:20});
  }
+
+ shot++;
 
 },120);
 
-/* ===== ガチャ（脳汁） ===== */
-function gacha(){
- if(money<100||gameOver)return;
- money-=100;
-
- effects.push({type:"gachaDark",t:40});
-
- setTimeout(()=>{
-  effects.push({type:"gachaFlash",t:20});
- },300);
-
- setTimeout(()=>{
-  let r=Math.random();
-  let result="Pistol";
-
-  if(r<0.6) result="Pistol";
-  else if(r<0.9) result="Shotgun";
-  else if(r<0.98) result="Laser";
-  else{
-   result="GOD";
-   shake=25;
-  }
-
-  weapon=result;
-
-  effects.push({type:"gachaText",text:"!!!",t:20});
-  setTimeout(()=>{
-   effects.push({type:"gachaText",text:result,t:40});
-  },200);
-
- },600);
-}
-
-/* ===== レベルアップ ===== */
-function levelUp(){
- if(money<200)return;
- money-=200;
- atk++;
- shake=10;
-}
-
 /* ===== ダメージ ===== */
-function damageEnemy(z,d){
- let crit=Math.random()<0.2;
+function hit(z,d){
+ let crit=Math.random()<0.25;
  if(crit)d*=3;
 
  z.hp-=d;
+ damages.push({x:z.x,y:z.y,v:d,t:30,crit});
 
- damages.push({
-  x:z.x,y:z.y,v:d,t:30,crit
- });
+ return d;
 }
 
 /* ===== 撃破 ===== */
@@ -200,6 +147,32 @@ function kill(z){
  score+=gain;
 
  coins.push({x:z.x,y:z.y,v:gain});
+}
+
+/* ===== ガチャ（スキル） ===== */
+function gacha(){
+ if(money<100)return;
+ money-=100;
+
+ effects.push({type:"dark",t:30});
+
+ setTimeout(()=>{
+  let pool=["beam","multi","heal","speed"];
+  let s=pool[Math.floor(Math.random()*pool.length)];
+  skills.push(s);
+
+  if(s==="heal") hp=Math.min(100,hp+30);
+  if(s==="speed") player.atk+=0.3;
+
+  effects.push({type:"text",text:s.toUpperCase(),t:40});
+ },400);
+}
+
+/* ===== 強化（無限） ===== */
+function levelUp(){
+ if(money<50)return;
+ money-=50;
+ player.atk+=0.2;
 }
 
 /* ===== 更新 ===== */
@@ -220,16 +193,13 @@ function update(){
   z.x+=dx/d;
   z.y+=dy/d;
 
-  if(d<20){
-   hp-=0.3;
-   shake=10;
-  }
+  if(d<20){hp-=0.3;shake=10;}
  });
 
  zombies=zombies.filter(z=>{
   for(let b of bullets){
    if(Math.hypot(z.x-b.x,z.y-b.y)<15){
-    damageEnemy(z,b.dmg);
+    hit(z,b.dmg);
     if(z.hp<=0){kill(z);return false;}
    }
   }
@@ -241,9 +211,11 @@ function update(){
   boss.y+=1;
   if(boss.y>120)boss.y=120;
 
+  boss.x+=Math.sin(time*0.1)*3;
+
   bullets.forEach(b=>{
    if(Math.hypot(boss.x-b.x,boss.y-b.y)<40){
-    damageEnemy(boss,b.dmg);
+    hit(boss,b.dmg);
    }
   });
 
@@ -255,10 +227,10 @@ function update(){
   }
 
   if(boss.hp<=0){
-   for(let i=0;i<120;i++){
+   for(let i=0;i<150;i++){
     coins.push({x:boss.x,y:boss.y,v:20});
+    effects.push({type:"flash",t:30});
    }
-   shake=30;
    boss=null;
   }
  }
@@ -266,8 +238,7 @@ function update(){
  bossBullets.forEach(b=>{
   b.x+=b.dx;b.y+=b.dy;
   if(Math.hypot(player.x-b.x,player.y-b.y)<15){
-   hp-=1;
-   shake=15;
+   hp-=1;shake=15;
   }
  });
 
@@ -287,14 +258,13 @@ function update(){
  damages=damages.filter(d=>{d.y-=1.5;d.t--;return d.t>0;});
  effects=effects.filter(e=>e.t-- >0);
 
- if(hp<=0) gameOver=true;
+ if(hp<=0)gameOver=true;
 
- document.getElementById("hp").textContent=Math.floor(hp);
- document.getElementById("money").textContent=money;
- document.getElementById("score").textContent=Math.floor(score);
- document.getElementById("combo").textContent=combo;
- document.getElementById("weapon").textContent=weapon;
- document.getElementById("atk").textContent=atk;
+ hpEl.textContent=Math.floor(hp);
+ moneyEl.textContent=money;
+ scoreEl.textContent=Math.floor(score);
+ comboEl.textContent=combo;
+ weaponEl.textContent=weapon;
 }
 
 /* ===== 描画 ===== */
@@ -306,10 +276,21 @@ function draw(){
   shake*=0.9;
  }
 
- ctx.fillStyle="#000";ctx.fillRect(0,0,c.width,c.height);
+ ctx.fillStyle="#000";
+ ctx.fillRect(0,0,c.width,c.height);
 
+ /* プレイヤー */
  ctx.fillStyle="#0ff";
- ctx.beginPath();ctx.arc(player.x,player.y,12,0,Math.PI*2);ctx.fill();
+ ctx.beginPath();
+ ctx.arc(player.x,player.y,12,0,Math.PI*2);
+ ctx.fill();
+
+ /* 向き */
+ ctx.strokeStyle="#0ff";
+ ctx.beginPath();
+ ctx.moveTo(player.x,player.y);
+ ctx.lineTo(player.x+player.vx*5,player.y+player.vy*5);
+ ctx.stroke();
 
  /* 弾 */
  bullets.forEach(b=>{
@@ -318,15 +299,15 @@ function draw(){
   ctx.moveTo(b.x,b.y);
   ctx.lineTo(b.x-b.dx*2,b.y-b.dy*2);
   ctx.stroke();
-
-  ctx.fillRect(b.x,b.y,4,4);
  });
 
+ /* 敵 */
+ ctx.strokeStyle="#f00";
  zombies.forEach(z=>{
-  ctx.strokeStyle="#f00";
   ctx.strokeRect(z.x-12,z.y-12,24,24);
  });
 
+ /* ボス */
  if(boss){
   ctx.strokeStyle="#ff0";
   ctx.strokeRect(boss.x-40,boss.y-40,80,80);
@@ -335,37 +316,38 @@ function draw(){
   ctx.fillRect(20,c.height-20,(boss.hp/boss.max)*200,10);
  }
 
- coins.forEach(c=>{
-  ctx.fillStyle="#ff0";
-  ctx.fillRect(c.x,c.y,6,6);
- });
-
+ /* ダメージ */
  damages.forEach(d=>{
   ctx.fillStyle=d.crit?"#ff0":"#fff";
   ctx.font=d.crit?"24px monospace":"14px monospace";
   ctx.fillText(d.v,d.x,d.y);
  });
 
+ /* エフェクト */
  effects.forEach(e=>{
+  if(e.type==="beam"){
+   ctx.fillStyle="rgba(255,255,0,"+(e.t/20)+")";
+   ctx.fillRect(e.x-5,0,10,c.height);
+  }
+  if(e.type==="flash"){
+   ctx.fillStyle="rgba(255,255,255,"+(e.t/20)+")";
+   ctx.fillRect(0,0,c.width,c.height);
+  }
+  if(e.type==="dark"){
+   ctx.fillStyle="rgba(0,0,0,0.7)";
+   ctx.fillRect(0,0,c.width,c.height);
+  }
+  if(e.type==="text"){
+   ctx.fillStyle="#0ff";
+   ctx.font="40px monospace";
+   ctx.fillText(e.text,c.width/2-100,c.height/2);
+  }
   if(e.type==="muzzle"){
    ctx.strokeStyle="rgba(0,255,0,"+(e.t/10)+")";
    ctx.beginPath();
    ctx.moveTo(e.x,e.y);
    ctx.lineTo(e.x-e.dx*20,e.y-e.dy*20);
    ctx.stroke();
-  }
-  if(e.type==="gachaDark"){
-   ctx.fillStyle="rgba(0,0,0,0.8)";
-   ctx.fillRect(0,0,c.width,c.height);
-  }
-  if(e.type==="gachaFlash"){
-   ctx.fillStyle="rgba(255,255,255,0.7)";
-   ctx.fillRect(0,0,c.width,c.height);
-  }
-  if(e.type==="gachaText"){
-   ctx.fillStyle="#0ff";
-   ctx.font="40px monospace";
-   ctx.fillText(e.text,c.width/2-100,c.height/2);
   }
  });
 
@@ -401,16 +383,8 @@ ontouchmove=e=>{
  player.vy+=y*0.02;
 };
 
-ontouchstart=()=>{
- if(gameOver) location.reload();
-};
-
-/* ループ */
-function loop(){
- update();
- draw();
- requestAnimationFrame(loop);
-}
+/* ===== ループ ===== */
+function loop(){update();draw();requestAnimationFrame(loop);}
 loop();
 </script>
 </body>
